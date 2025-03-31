@@ -2,7 +2,7 @@
 Recall client and wrapper contract interactions
 """
 
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, Dict, Optional
 
 import requests
 from eth_account.account import LocalAccount
@@ -24,14 +24,42 @@ from .constants import (
     IMACHINE_FACADE_ABI,
     RPC_TIMEOUT,
     TESTNET_CHAIN_ID,
+    LOCALNET_CHAIN_ID,
+    DEVNET_CHAIN_ID,
+    TESTNET_SUBNET_ID,
     get_evm_rpc_url,
     get_object_api_url,
 )
 from .exceptions import ContractError, ObjectNotFoundError, UnexpectedError
 from .types import CreatedBucketResponse, EventLog
+from .entities.ipc.subnet import SubnetId
+from .entities.account import AccountManager
+from .entities.blob import BlobManager
+from .entities.bucket import BucketManager
+from .entities.credit import CreditManager 
 
 T = TypeVar("T")
 
+ContractConfig = Dict[int, ChecksumAddress]
+
+
+class ContractOverrides:
+    """Contract address overrides configuration"""
+    
+    def __init__(
+        self,
+        bucket_manager: Optional[ContractConfig] = None,
+        blob_manager: Optional[ContractConfig] = None,
+        credit_manager: Optional[ContractConfig] = None,
+        account_manager: Optional[Dict[str, ContractConfig]] = None,
+    ):
+        self.bucket_manager = bucket_manager or {}
+        self.blob_manager = blob_manager or {}
+        self.credit_manager = credit_manager or {}
+        self.account_manager = account_manager or {
+            "gateway_manager": {},
+            "recall_erc20": {},
+        }
 
 class Client:
     """
@@ -39,19 +67,20 @@ class Client:
     """
 
     w3: Web3
-    signer: LocalAccount
+    signer: Optional[LocalAccount]
     evm_rpc_url: str
     object_api_url: str
-    blob_manager: Contract
-    bucket_manager: Contract
-    credit_manager: Contract
+    chain_id: int
+    contract_overrides: ContractOverrides
+    subnet_id: SubnetId
 
     def __init__(
         self,
-        private_key: str,
+        private_key: Optional[str] = None,
         chain_id: int = TESTNET_CHAIN_ID,
-        evm_rpc_url: str | None = None,
-        object_api_url: str | None = None,
+        evm_rpc_url: Optional[str] = None,
+        object_api_url: Optional[str] = None,
+        contract_overrides: Optional[ContractOverrides] = None,
     ):
         # Set up web3 instance, signer, and objects API
         if evm_rpc_url is None:
@@ -62,19 +91,53 @@ class Client:
         self.w3 = w3
         self.signer = Account.from_key(private_key)
         self.object_api_url = object_api_url
+        self.chain_id = chain_id
+        self.contract_overrides = contract_overrides or ContractOverrides()
 
+        # Set up signer if private key provided
+        if private_key:
+            self.signer = Account.from_key(private_key)
+        else:
+            self.signer = None
+
+        # Initialize subnet ID
+        if chain_id == TESTNET_CHAIN_ID:
+            self.subnet_id = SubnetId.from_string(TESTNET_SUBNET_ID)
+        else:
+            # TODO: Add support for other chains
+            self.subnet_id = SubnetId.from_chain(chain_id)
+            
         # Set up Recall contracts
-        chain_id = self.get_chain_id()
-        blob_manager_addr = BLOB_MANAGER_ADDRESS[chain_id]
-        bucket_manager_addr = BUCKET_MANAGER_ADDRESS[chain_id]
-        credit_manager_addr = CREDIT_MANAGER_ADDRESS[chain_id]
-        self.blob_manager = self.w3.eth.contract(address=to_checksum_address(blob_manager_addr), abi=BLOB_MANAGER_ABI)
-        self.bucket_manager = self.w3.eth.contract(
-            address=to_checksum_address(bucket_manager_addr), abi=BUCKET_MANAGER_ABI
-        )
-        self.credit_manager = self.w3.eth.contract(
-            address=to_checksum_address(credit_manager_addr), abi=CREDIT_MANAGER_ABI
-        )
+        # chain_id = self.get_chain_id()
+        # blob_manager_addr = BLOB_MANAGER_ADDRESS[chain_id]
+        # bucket_manager_addr = BUCKET_MANAGER_ADDRESS[chain_id]
+        # credit_manager_addr = CREDIT_MANAGER_ADDRESS[chain_id]
+        # self.blob_manager = self.w3.eth.contract(address=to_checksum_address(blob_manager_addr), abi=BLOB_MANAGER_ABI)
+        # self.bucket_manager = self.w3.eth.contract(
+        #     address=to_checksum_address(bucket_manager_addr), abi=BUCKET_MANAGER_ABI
+        # )
+        # self.credit_manager = self.w3.eth.contract(
+        #     address=to_checksum_address(credit_manager_addr), abi=CREDIT_MANAGER_ABI
+        # )
+    
+    @classmethod
+    def from_chain(cls, chain_id: int = TESTNET_CHAIN_ID, private_key: Optional[str] = None) -> "Client":
+        """Create a client for a specific chain"""
+        return cls(private_key=private_key, chain_id=chain_id)
+    
+    @classmethod
+    def from_chain_name(cls, chain_name: str = "testnet", private_key: Optional[str] = None) -> "Client":
+        """Create a client from a chain name (testnet, localnet, devnet)"""
+        chain_map = {
+            "testnet": TESTNET_CHAIN_ID,
+            "localnet": LOCALNET_CHAIN_ID,
+            "devnet": DEVNET_CHAIN_ID,
+        }
+        
+        if chain_name not in chain_map:
+            raise ValueError(f"Unknown chain name: {chain_name}")
+            
+        return cls.from_chain(chain_map[chain_name], private_key)
 
     def get_chain_id(self) -> int:
         """Get the chain ID for the current network"""
@@ -96,97 +159,55 @@ class Client:
         """Parse a transaction receipt for a given event type"""
         event = getattr(contract.events, event_type)()
         return event.process_receipt(tx_receipt, errors=EventLogErrorFlags.Discard)
+    
+    def get_subnet_id(self) -> SubnetId:
+        """Get the subnet ID for the current client"""
+        return self.subnet_id
+        
+    def switch_chain(self, chain_id: int) -> None:
+        """
+        Switch to a different chain
+        
+        Args:
+            chain_id: Chain ID to switch to
+        """
+        self.evm_rpc_url = get_evm_rpc_url(chain_id)
+        self.object_api_url = get_object_api_url(chain_id)
+        self.chain_id = chain_id
+        self.w3 = Web3(Web3.HTTPProvider(self.evm_rpc_url))
+        
+        self.subnet_id = SubnetId.from_chain(chain_id)
 
-    def _handle_bucket_creation_failure(self) -> None:
-        """Handle bucket creation failure by raising an appropriate error."""
-        raise UnexpectedError(UnexpectedError.BUCKET_CREATION_FAILED)
+    def account_manager(self) -> AccountManager:
+        """Get an account manager instance"""
+        return AccountManager(self)
 
-    def create_bucket(self, owner: str | None = None, metadata: dict | None = None) -> CreatedBucketResponse | None:
-        """Create a bucket for a given owner or default to the signer's address"""
-        try:
-            # Function arguments
-            metadata = metadata or {}
-            metadata_list = [(key, str(value)) for key, value in metadata.items()]
-            owner = owner if owner is not None else self.get_signer_address()
+    def blob_manager(self, contract_address: Optional[str] = None) -> BlobManager:
+        """Get a blob manager instance"""
+        chain_id = self.get_chain_id()
+        override = (
+            contract_address or 
+            self.contract_overrides.blob_manager.get(chain_id)
+        )
+        return BlobManager(self, override)
 
-            # Build tx with custom gas params
-            gas = self.bucket_manager.functions.createBucket(
-                owner,
-                metadata_list,
-            ).estimate_gas()
-            tx = self.bucket_manager.functions.createBucket(
-                owner,
-                metadata_list,
-            ).build_transaction({
-                "from": self.get_signer_address(),
-                "gas": gas,
-                "maxFeePerGas": currency.to_wei(100, "wei"),
-                "maxPriorityFeePerGas": currency.to_wei(1, "wei"),
-                "nonce": self.get_nonce(),
-            })
-            typed_tx = cast(dict[str, Any], tx)
-            # Sign and send the transaction
-            signed_tx = self.signer.sign_transaction(typed_tx)
-            tx_hash = self.w3.eth.send_raw_transaction(HexBytes(signed_tx["raw_transaction"]))
+    def bucket_manager(self, contract_address: Optional[str] = None) -> BucketManager:
+        """Get a bucket manager instance"""
+        chain_id = self.get_chain_id()
+        override = (
+            contract_address or 
+            self.contract_overrides.bucket_manager.get(chain_id)
+        )
+        return BucketManager(self, override)
 
-            # Parse tx receipt
-            machine_facade_contract = self.w3.eth.contract(
-                address=to_checksum_address(BUCKET_MANAGER_ADDRESS[self.get_chain_id()]), abi=IMACHINE_FACADE_ABI
-            )
-            rec = self.wait_for_tx_receipt(tx_hash)
-            log = self.parse_tx_receipt(machine_facade_contract, rec, "MachineInitialized")
-            args = log[0]["args"] if len(log) > 0 else None
-            if args is None:
-                self._handle_bucket_creation_failure()
-            return CreatedBucketResponse(bucket=args["machineAddress"], kind=args["kind"])
-        except ContractLogicError as e:
-            raise ContractError(str(e)) from e
-        except Exception as e:
-            raise UnexpectedError(str(e)) from e
-
-    def list_buckets(self, owner: str | None = None) -> Any:
-        """List buckets for a given owner or default to the signer's address"""
-        try:
-            return self.bucket_manager.functions.listBuckets(
-                owner if owner is not None else self.get_signer_address(),
-            ).call()
-        except ContractLogicError as e:
-            raise ContractError(str(e)) from e
-        except Exception as e:
-            raise UnexpectedError(str(e)) from e
-
-    def get_object_state(self, bucket: str, key: str) -> Any | None:
-        """Get an object's state (without downloading the object)"""
-        try:
-            bucket_addr = to_checksum_address(bucket)
-            return self.bucket_manager.functions.getObject(bucket_addr, key).call()
-        except ContractLogicError as e:
-            raise ContractError(str(e)) from e
-        except Exception as e:
-            raise UnexpectedError(str(e)) from e
-
-    def _ensure_object_exists(self, bucket: str, key: str, obj: dict | None) -> None:
-        """Helper function to check if object exists and raise if not."""
-        if obj is None:
-            raise ObjectNotFoundError(bucket, key)
-
-    def get_object(self, bucket: str, key: str) -> bytes:
-        """Get an object's data"""
-        try:
-            obj = self.get_object_state(bucket, key)
-            self._ensure_object_exists(bucket, key, obj)
-            response = requests.get(
-                f"{self.object_api_url}/v1/objects/{bucket}/{key}",
-                timeout=RPC_TIMEOUT,
-            )
-            if response.content:
-                return response.content
-            else:
-                return b""
-        except ContractLogicError as e:
-            raise ContractError(str(e)) from e
-        except Exception as e:
-            raise UnexpectedError(str(e)) from e
+    def credit_manager(self, contract_address: Optional[str] = None) -> CreditManager:
+        """Get a credit manager instance"""
+        chain_id = self.get_chain_id()
+        override = (
+            contract_address or 
+            self.contract_overrides.credit_manager.get(chain_id)
+        )
+        return CreditManager(self, override)
 
 
 if __name__ == "__main__":  # pragma: no cover
