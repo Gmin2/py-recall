@@ -1,11 +1,12 @@
 """Type definitions for the Recall SDK."""
 
-from typing import TypedDict, Union
+from dataclasses import dataclass
+from typing import Any, TypedDict, Union
 
 from eth_typing import ChecksumAddress
 
 
-class CreatedBucketResponse(TypedDict):
+class CreateBucketResponse(TypedDict):
     """Type definition for BucketCreated event data."""
 
     kind: int
@@ -17,6 +18,53 @@ class MachineInitializedEvent(TypedDict):
 
     kind: int
     machineAddress: ChecksumAddress
+
+
+@dataclass
+class BucketMetadata:
+    """Bucket metadata class."""
+
+    kind: int
+    addr: ChecksumAddress
+    metadta: dict[str, str]
+
+
+@dataclass
+class ObjectValue:
+    """Object value class for metadata."""
+
+    blobHash: str
+    recoveryHash: str
+    size: int
+    expiry: int
+    metadata: dict[str, str]
+
+
+@dataclass
+class ObjectState:
+    """Object state for query results."""
+
+    blobHash: str
+    size: int
+    expiry: int
+    metadata: dict[str, str]
+
+
+@dataclass
+class QueryObject:
+    """Single object in a query result."""
+
+    key: str
+    state: ObjectState
+
+
+@dataclass
+class QueryResult:
+    """Query result class."""
+
+    objects: list[dict[str, Any]]
+    commonPrefixes: list[str]
+    nextKey: str
 
 
 class EventLog(TypedDict):
