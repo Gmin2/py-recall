@@ -26,7 +26,7 @@ class BucketMetadata:
 
     kind: int
     addr: ChecksumAddress
-    metadta: dict[str, str]
+    metadata: dict[str, str]
 
 
 @dataclass
