@@ -77,7 +77,7 @@ BLOB_MANAGER_ADDRESS = {
 }
 
 BUCKET_MANAGER_ADDRESS = {
-    2481632: "0x7a9Cec860adF2C64274D0aD7fbF0b5Bf0426a200",  # testnet -- TODO: update this upon new testnet deployments
+    2481632: "0x170a22c76a2Bb7c5F1b0e7067a0ddb7C3452c8e0",  # testnet -- TODO: update this upon new testnet deployments
     248163216: "0xeD1DB453C3156Ff3155a97AD217b3087D5Dc5f6E",  # localnet
 }
 

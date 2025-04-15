@@ -12,6 +12,11 @@ class RecallError(Exception):
 class ContractError(RecallError):
     """Exception raised for contract-related errors."""
 
+    CONTRACT_ADDRESS_NOT_FOUND = "No contract address found for chain ID: {}"
+
+    def _raise_bucket_creation_error():
+        raise UnexpectedError(UnexpectedError.BUCKET_CREATION_FAILED)
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
