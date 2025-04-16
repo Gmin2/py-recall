@@ -82,7 +82,7 @@ BUCKET_MANAGER_ADDRESS = {
 }
 
 CREDIT_MANAGER_ADDRESS = {
-    2481632: "0x61F50eEC83043a4635956B54EEDf5Eea8CcaBc76",  # testnet -- TODO: update this upon new testnet deployments
+    2481632: "0x296042865b783D8E8Fb09F04FFAE2A66a16B85Bc",  # testnet -- TODO: update this upon new testnet deployments
     248163216: "0x196dBCBb54b8ec4958c959D8949EBFE87aC2Aaaf",  # localnet
 }
 

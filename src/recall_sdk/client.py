@@ -13,7 +13,7 @@ from .constants import (
     get_evm_rpc_url,
     get_object_api_url,
 )
-from .managers import BucketManager
+from .managers import BucketManager, CreditManager
 
 T = TypeVar("T")
 
@@ -58,3 +58,10 @@ class Client:
         if not override and hasattr(self, "_contract_overrides") and isinstance(self._contract_overrides, dict):
             override = self._contract_overrides.get("bucket_manager")
         return BucketManager(self, override)
+
+    def credit_manager(self, contract_address: Optional[str] = None) -> CreditManager:
+        """Get a credit manager instance"""
+        override = contract_address
+        if not override and hasattr(self, "_contract_overrides") and isinstance(self._contract_overrides, dict):
+            override = self._contract_overrides.get("credit_manager")
+        return CreditManager(self, override)
