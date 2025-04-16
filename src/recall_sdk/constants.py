@@ -72,7 +72,7 @@ IERC20_ABI = read_abi_file_to_json(Path(__file__).parent / "abis" / "IERC20.json
 
 # Wrapper contract addresses, and addresses above formatted in the same way
 BLOB_MANAGER_ADDRESS = {
-    2481632: "0x6E3f94065567560c6e1Bbc5e4584127220c15e14",  # testnet -- TODO: update this upon new testnet deployments
+    2481632: "0x27594F8412bA08278b15b55C6347605Ee3b2020C",  # testnet -- TODO: update this upon new testnet deployments
     248163216: "0x8ce361602B935680E8DeC218b820ff5056BeB7af",  # localnet
 }
 

@@ -89,3 +89,38 @@ class UnhandledBucketError(RecallError):
 
     def __init__(self, message: str) -> None:
         super().__init__(f"Bucket error: {message}")
+
+class BlobNotFoundError(RecallError):
+    """Exception raised when a blob is not found."""
+
+    def __init__(self, blob_hash: str) -> None:
+        super().__init__(f"Blob not found: '{blob_hash}'")
+        self.blob_hash = blob_hash
+
+
+class AddBlobError(RecallError):
+    """Exception raised when adding a blob fails."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"Failed to add blob: {message}")
+
+
+class OverwriteBlobError(RecallError):
+    """Exception raised when overwriting a blob fails."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"Failed to overwrite blob: {message}")
+
+
+class DeleteBlobError(RecallError):
+    """Exception raised when deleting a blob fails."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"Failed to delete blob: {message}")
+
+
+class UnhandledBlobError(RecallError):
+    """Exception raised for unhandled blob errors."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"Blob error: {message}")

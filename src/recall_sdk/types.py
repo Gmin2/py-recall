@@ -157,3 +157,73 @@ class TransactionResponse(TypedDict):
 
     receipt: dict[str, Any]
     transactionHash: str
+
+# Blob manager types
+
+
+@dataclass
+class BlobSourceInfo:
+    """Source information for a blob."""
+    subscriber: str
+    subscriptionId: str
+    source: str
+
+
+@dataclass
+class BlobTuple:
+    """Blob tuple result."""
+    blobHash: str
+    sourceInfo: list[BlobSourceInfo]
+
+
+@dataclass
+class Subscriber:
+    """Subscriber information for a blob."""
+    subscriptionId: str
+    expiry: int
+
+
+@dataclass
+class Blob:
+    """Blob information."""
+    size: int
+    metadataHash: str
+    subscribers: list[Subscriber]
+    status: int
+
+
+@dataclass
+class StorageStats:
+    """Storage statistics."""
+    capacityFree: int
+    capacityUsed: int
+    numBlobs: int
+    numResolving: int
+    numAccounts: int
+    bytesResolving: int
+    numAdded: int
+    bytesAdded: int
+
+
+@dataclass
+class SubnetStats:
+    """Subnet statistics."""
+    balance: int
+    capacityFree: int
+    capacityUsed: int
+    creditSold: int
+    creditCommitted: int
+    creditDebited: int
+    tokenCreditRate: int
+    numAccounts: int
+    numBlobs: int
+    numAdded: int
+    bytesAdded: int
+    numResolving: int
+    bytesResolving: int
+
+
+class AddBlobOptions(TypedDict, total=False):
+    """Options for adding a blob."""
+    ttl: int
+    sponsor: str
